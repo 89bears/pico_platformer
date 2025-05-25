@@ -112,7 +112,7 @@ class Player:
     
     def draw(self):
         """Draw the player"""
-        picosystem.pen(*BLUE)
+        picosystem.pen(*RED)
         picosystem.frect(int(self.x), int(self.y), self.width, self.height)
         
         # Draw eyes
@@ -189,8 +189,8 @@ class Game:
     def setup_level(self):
         """Create the level layout"""
         # Ground platforms
-        self.platforms.append(Platform(0, 110, 40, 10))
-        self.platforms.append(Platform(60, 110, 60, 10))
+        self.platforms.append(Platform(0, 110, 40, 10, GREEN))
+        self.platforms.append(Platform(60, 110, 60, 10, GREEN))
         
         # Mid-level platforms
         self.platforms.append(Platform(30, 90, 20, 8))
@@ -252,7 +252,7 @@ class Game:
     def draw(self):
         """Draw the game"""
         # Clear screen
-        picosystem.pen(*BLACK)
+        picosystem.pen(*BLUE)
         picosystem.clear()
         
         # Draw platforms
