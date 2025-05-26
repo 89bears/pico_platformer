@@ -30,6 +30,43 @@ YELLOW = (15, 15, 0)     # 5
 GRAY = (8, 8, 8)         # 7 (approximate mid-gray)
 BROWN = (8, 4, 0)        # 9 (approximate brown)
 
+class Enemy:
+    """Simple enemy that moves back and forth"""
+    
+    def __init__(self, x, y, move_range, speed):
+        self.start_x = x
+        self.x = x
+        self.y = y
+        self.width = 8
+        self.height = 8
+        self.move_range = move_range
+        self.speed = speed
+        self.direction = 1
+    
+    def update(self):
+        """Update enemy movement"""
+        self.x += self.speed * self.direction
+        
+        # Reverse direction at boundaries
+        if self.x <= self.start_x:
+            self.direction = 1
+        elif self.x >= self.start_x + self.move_range:
+            self.direction = -1
+    
+    def get_rect(self):
+        """Get rectangle for collision detection"""
+        return (self.x, self.y, self.width, self.height)
+    
+    def draw(self):
+        """Draw the enemy"""
+        picosystem.pen(*RED)
+        picosystem.frect(int(self.x), int(self.y), self.width, self.height)
+        
+        # Draw angry eyes
+        picosystem.pen(*WHITE)
+        picosystem.pixel(int(self.x + 2), int(self.y + 2))
+        picosystem.pixel(int(self.x + 5), int(self.y + 2))
+
 class Player:
     """Player character with physics and controls"""
     
@@ -167,14 +204,30 @@ class Collectible:
     def draw(self):
         """Draw the collectible"""
         if not self.collected:
-            picosystem.pen(*YELLOW)
             y_pos = int(self.y + self.bob_offset)
-            picosystem.frect(self.x, y_pos, self.width, self.height)
-            
-            # Draw shine effect
-            picosystem.pen(*WHITE)
-            picosystem.pixel(self.x + 1, y_pos + 1)
-
+            if hasattr(self, "is_star") and self.is_star:
+                # Draw a 5-pointed star shape
+                picosystem.pen(*YELLOW)
+                cx = int(self.x + self.width // 2)
+                cy = int(y_pos + self.height // 2)
+                # Center
+                picosystem.pixel(cx, cy)
+                # Star points
+                picosystem.pixel(cx, cy - 3)  # Top
+                picosystem.pixel(cx - 2, cy + 2)  # Bottom left
+                picosystem.pixel(cx + 2, cy + 2)  # Bottom right
+                picosystem.pixel(cx - 3, cy - 1)  # Left
+                picosystem.pixel(cx + 3, cy - 1)  # Right
+                # Optional: add more pixels for a fuller star
+                picosystem.pixel(cx - 1, cy)
+                picosystem.pixel(cx + 1, cy)
+                picosystem.pixel(cx, cy + 1)
+            else:
+                picosystem.pen(*YELLOW)
+                picosystem.frect(self.x, y_pos, self.width, self.height)
+                # Draw shine effect
+                picosystem.pen(*WHITE)
+                picosystem.pixel(self.x + 1, y_pos + 1)
 
 class Game:
     """Main game class"""
@@ -184,6 +237,7 @@ class Game:
         self.platforms = []
         self.collectibles = []
         self.score = 0
+        self.game_complete = False
         self.setup_level()
     
     def setup_level(self):
@@ -193,18 +247,18 @@ class Game:
         self.platforms.append(Platform(60, 110, 60, 10, GREEN))
         
         # Mid-level platforms
-        self.platforms.append(Platform(30, 90, 20, 8))
-        self.platforms.append(Platform(70, 80, 25, 8))
-        self.platforms.append(Platform(15, 70, 20, 8))
-        self.platforms.append(Platform(80, 60, 30, 8))
+        self.platforms.append(Platform(30, 90, 20, 8, WHITE))
+        self.platforms.append(Platform(70, 80, 25, 8, WHITE))
+        self.platforms.append(Platform(15, 70, 20, 8, WHITE))
+        self.platforms.append(Platform(80, 60, 30, 8, WHITE))
         
         # Upper platforms
-        self.platforms.append(Platform(10, 50, 25, 8))
-        self.platforms.append(Platform(50, 40, 30, 8))
-        self.platforms.append(Platform(90, 30, 25, 8))
+        self.platforms.append(Platform(10, 50, 25, 8, WHITE))
+        self.platforms.append(Platform(50, 40, 30, 8, WHITE))
+        self.platforms.append(Platform(90, 30, 25, 8, WHITE))
         
         # Top platform
-        self.platforms.append(Platform(40, 20, 40, 8))
+        self.platforms.append(Platform(40, 20, 40, 8, GRAY))
         
         # Add collectibles
         self.collectibles.append(Collectible(35, 82))
@@ -214,14 +268,22 @@ class Game:
         self.collectibles.append(Collectible(20, 42))
         self.collectibles.append(Collectible(65, 32))
         self.collectibles.append(Collectible(98, 22))
-        self.collectibles.append(Collectible(55, 12))
-    
+       
+        # Special collectible (star)
+        self.star = Collectible(55, 12)
+        self.star.is_star = True
+        self.collectibles.append(self.star)
+
+          
     def update(self):
         """Update game state"""
-        # Handle restart
+        # Allow restart even if game is complete
         if picosystem.pressed(picosystem.X):
             self.restart_level()
             return
+
+        if self.game_complete:
+            return 
         
         # Update player
         self.player.update(self.platforms)
@@ -241,20 +303,33 @@ class Game:
         # Check if player fell off screen
         if self.player.y > SCREEN_HEIGHT + 20:
             self.restart_level()
+        
+         # Check if the star has been collected
+        if self.star.collected:
+            self.game_complete = True
     
     def restart_level(self):
         """Restart the current level"""
         self.player.reset()
         self.score = 0
+        self.game_complete = False
         for collectible in self.collectibles:
             collectible.collected = False
     
     def draw(self):
         """Draw the game"""
-        # Clear screen
+        if self.game_complete:
+            # Clear screen
+            picosystem.pen(*BLUE)
+            picosystem.clear()
+            # Draw only the win UI
+            self.draw_ui()
+            return
+    
+        # Normal drawing when game is not complete
         picosystem.pen(*BLUE)
         picosystem.clear()
-        
+
         # Draw platforms
         for platform in self.platforms:
             platform.draw()
@@ -275,15 +350,20 @@ class Game:
         picosystem.pen(*WHITE)
         picosystem.text(f"Score: {self.score}", 2, 2)
         
-        # Draw controls hint
-        # picosystem.text("X: Restart", 2, SCREEN_HEIGHT - 10)
-        
-        # Check for level completion
-        all_collected = all(c.collected for c in self.collectibles)
-        if all_collected:
-            picosystem.pen(*GREEN)
-            picosystem.text("Level Complete!", 25, 60)
-            picosystem.text("Press X to restart", 15, 70)
+        if self.game_complete:
+            picosystem.pen(*BLACK)
+            picosystem.text("You found the star!", 10, 60)
+            picosystem.text("Press X to restart", 10, 70)
+        else:
+            # Draw controls hint
+            # picosystem.text("X: Restart", 2, SCREEN_HEIGHT - 10)
+            
+            # Check for level completion
+            all_collected = all(c.collected for c in self.collectibles)
+            if all_collected:
+                picosystem.pen(*BLACK)
+                picosystem.text("Level Complete!", 25, 60)
+                picosystem.text("Press X to restart", 15, 70)
 
 
 # Global game instance
